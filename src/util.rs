@@ -29,6 +29,29 @@ pub fn prerocess(text: &str) -> (Corpus, WordToId, IdToWord) {
     (corpus, word_to_id, id_to_word)
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct CoMatrix(pub Vec<Vec<usize>>);
+
+pub fn create_co_matrix(corpus: &Corpus, window_size: usize) -> CoMatrix {
+    let vocab_size = corpus.0.iter().max().map_or(0, |w| w.0 + 1);
+    let mut m = vec![vec![0; vocab_size]; vocab_size];
+    for (idx, word_id) in corpus.0.iter().enumerate() {
+        for i in 1..window_size + 1 {
+            if let Some(left_idx) = idx.checked_sub(i) {
+                let left_word_id = corpus.0[left_idx];
+                m[word_id.0][left_word_id.0] += 1;
+            }
+
+            let right_idx = idx + i;
+            if right_idx < corpus.0.len() {
+                let right_word_id = corpus.0[right_idx];
+                m[word_id.0][right_word_id.0] += 1;
+            }
+        }
+    }
+    CoMatrix(m)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -41,5 +64,13 @@ mod tests {
             corpus.0.iter().map(|w| w.0).collect::<Vec<_>>(),
             [0, 1, 2, 3, 4, 1, 5, 6]
         );
+    }
+
+    #[test]
+    fn create_co_matrix_works() {
+        let text = "You say goodbye and I say hello.";
+        let (corpus, word_to_id, _id_to_word) = prerocess(text);
+        let c = create_co_matrix(&corpus, 1);
+        assert_eq!(c.0[word_to_id.0["goodbye"].0], [0, 1, 0, 1, 0, 0, 0]);
     }
 }
