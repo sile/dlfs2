@@ -62,6 +62,38 @@ pub fn cos_similarity(x: &[usize], y: &[usize]) -> f32 {
         .sum()
 }
 
+pub fn most_similar<'a>(
+    query: &str,
+    word_to_id: &WordToId,
+    id_to_word: &'a IdToWord,
+    word_matrix: &CoMatrix,
+) -> Vec<(&'a str, f32)> {
+    // (1)
+    let query_id = if let Some(id) = word_to_id.0.get(query) {
+        id
+    } else {
+        return Vec::new();
+    };
+
+    let query_vec = &word_matrix.0[query_id.0];
+
+    // (2)
+    let mut similarity = word_matrix
+        .0
+        .iter()
+        .enumerate()
+        .filter(|t| query_id.0 != t.0)
+        .map(|(i, v)| {
+            (
+                id_to_word.0[&WordId(i)].as_str(),
+                cos_similarity(v, query_vec),
+            )
+        }).collect::<Vec<_>>();
+    similarity.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    similarity.reverse();
+    similarity
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,6 +124,24 @@ mod tests {
         assert_eq!(
             cos_similarity(&c.0[word_to_id.0["you"].0], &c.0[word_to_id.0["i"].0]),
             0.70710665
+        );
+    }
+
+    #[test]
+    fn most_similar_works() {
+        let text = "You say goodbye and I say hello.";
+        let (corpus, word_to_id, id_to_word) = prerocess(text);
+        let c = create_co_matrix(&corpus, 1);
+        let similarity = most_similar("you", &word_to_id, &id_to_word, &c);
+        assert_eq!(
+            &similarity[..5],
+            [
+                ("hello", 0.70710665),
+                ("i", 0.70710665),
+                ("goodbye", 0.70710665),
+                (".", 0.0),
+                ("and", 0.0)
+            ]
         );
     }
 }
