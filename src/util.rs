@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::f32::EPSILON;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct WordId(pub usize);
@@ -52,6 +53,15 @@ pub fn create_co_matrix(corpus: &Corpus, window_size: usize) -> CoMatrix {
     CoMatrix(m)
 }
 
+pub fn cos_similarity(x: &[usize], y: &[usize]) -> f32 {
+    let x0 = x.iter().map(|&x| (x * x) as f32).sum::<f32>().sqrt() + EPSILON;
+    let y0 = y.iter().map(|&y| (y * y) as f32).sum::<f32>().sqrt() + EPSILON;
+    x.iter()
+        .zip(y.iter())
+        .map(|(&x, &y)| (x as f32 / x0) * (y as f32 / y0))
+        .sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -72,5 +82,16 @@ mod tests {
         let (corpus, word_to_id, _id_to_word) = prerocess(text);
         let c = create_co_matrix(&corpus, 1);
         assert_eq!(c.0[word_to_id.0["goodbye"].0], [0, 1, 0, 1, 0, 0, 0]);
+    }
+
+    #[test]
+    fn cos_similarity_works() {
+        let text = "You say goodbye and I say hello.";
+        let (corpus, word_to_id, _id_to_word) = prerocess(text);
+        let c = create_co_matrix(&corpus, 1);
+        assert_eq!(
+            cos_similarity(&c.0[word_to_id.0["you"].0], &c.0[word_to_id.0["i"].0]),
+            0.70710665
+        );
     }
 }
