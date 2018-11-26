@@ -1,3 +1,5 @@
+use ndarray::Array;
+use ndarray_linalg::SVD;
 use std::collections::HashMap;
 use std::f32::EPSILON;
 
@@ -32,6 +34,11 @@ pub fn prerocess(text: &str) -> (Corpus, WordToId, IdToWord) {
 
 #[derive(Debug, Clone, Default)]
 pub struct CoMatrix(pub Vec<Vec<usize>>);
+impl CoMatrix {
+    pub fn shape(&self) -> (usize, usize) {
+        (self.0.len(), self.0[0].len())
+    }
+}
 
 pub fn create_co_matrix(corpus: &Corpus, window_size: usize) -> CoMatrix {
     let vocab_size = corpus.0.iter().max().map_or(0, |w| w.0 + 1);
@@ -96,6 +103,11 @@ pub fn most_similar<'a>(
 
 #[derive(Debug, Clone, Default)]
 pub struct PmiMatrix(pub Vec<Vec<f32>>);
+impl PmiMatrix {
+    pub fn shape(&self) -> (usize, usize) {
+        (self.0.len(), self.0[0].len())
+    }
+}
 
 pub fn ppmi(c: &CoMatrix) -> PmiMatrix {
     let mut m = vec![vec![0.0; c.0[0].len()]; c.0.len()];
@@ -117,6 +129,26 @@ pub fn ppmi(c: &CoMatrix) -> PmiMatrix {
         }
     }
     PmiMatrix(m)
+}
+
+pub fn svd_u(matrix: &PmiMatrix) -> Vec<Vec<f32>> {
+    let mut m = Array::zeros(matrix.shape());
+    let (rows, cols) = matrix.shape();
+    for i in 0..rows {
+        for j in 0..cols {
+            m[[i, j]] = matrix.0[i][j];
+        }
+    }
+    let (u, _, _) = m.svd(true, true).unwrap();
+    let u = u.unwrap();
+
+    let mut v = vec![vec![0.0; cols]; rows];
+    for i in 0..rows {
+        for j in 0..cols {
+            v[i][j] = u[[i, j]];
+        }
+    }
+    v
 }
 
 #[cfg(test)]
@@ -168,5 +200,17 @@ mod tests {
                 ("and", 0.0)
             ]
         );
+    }
+
+    #[test]
+    fn svd_u_works() {
+        let text = "You say goodbye and I say hello.";
+        let (corpus, _word_to_id, _id_to_word) = prerocess(text);
+        let c = create_co_matrix(&corpus, 1);
+        let w = ppmi(&c);
+        let u = svd_u(&w);
+        assert_eq!(c.0[0], [0, 1, 0, 0, 0, 0, 0]);
+        assert_eq!(w.0[0], [0., 1.8073549, 0., 0., 0., 0., 0.]);
+        assert_eq!(u[0], []);
     }
 }
