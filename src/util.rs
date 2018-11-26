@@ -94,6 +94,31 @@ pub fn most_similar<'a>(
     similarity
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct PmiMatrix(pub Vec<Vec<f32>>);
+
+pub fn ppmi(c: &CoMatrix) -> PmiMatrix {
+    let mut m = vec![vec![0.0; c.0[0].len()]; c.0.len()];
+
+    let n = c.0.iter().map(|t| t.iter().sum::<usize>()).sum::<usize>();
+    let mut s = vec![0; c.0[0].len()];
+    for i in 0..s.len() {
+        for j in 0..c.0.len() {
+            s[i] += c.0[j][i];
+        }
+    }
+
+    for i in 0..c.0.len() {
+        for j in 0..c.0[0].len() {
+            let pmi = ((((c.0[i][j] * n) as f32) / (s[j] * s[i]) as f32) + EPSILON).log2();
+            if pmi > 0.0 {
+                m[i][j] = pmi;
+            }
+        }
+    }
+    PmiMatrix(m)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
